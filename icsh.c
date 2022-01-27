@@ -1,0 +1,98 @@
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
+
+char *history[100];
+char *commandList[10];
+int commandNum = 3;
+int historyLen = -1;
+
+void echo(char** command, int n) {
+    for (int i=1; i<n; i++) {
+        printf("%s", command[i]);
+        if (i < n-1) printf(" ");
+    }
+}
+
+void addHistory(char** command, int n) {
+    for (int i=0; i<n; i++) {
+        free(history[i]);
+        history[i] = strdup(command[i]);
+    }
+    historyLen = n;
+
+}
+
+void createCommand(char** list) {
+
+    list[0] = "echo";
+    list[1] = "!!\n";
+    list[2] = "exit";
+
+}
+
+int seperateInput(char* command, char** output) {
+
+    char* words = strtok(command, " ");
+
+    int i = 0;
+    while (words != NULL) {
+        output[i++] = words;
+        words = strtok(NULL, " ");
+    }
+
+    return i;
+}
+
+//update: 0 = don't update history, 1 = update history
+void processInput(char** command, int wordCount, int update) {
+
+	//when called '!!' and there is no last command
+	if ((strcmp("!!\n", command[0]) == 0) && historyLen == -1) return;
+
+    int commandID = 0;
+    for (int i=0; i<commandNum; i++) {
+        if (strcmp(command[0], commandList[i]) == 0) {
+            commandID = i+1;
+            break;
+        }
+    }
+
+
+    switch (commandID) {
+    case 0:
+        printf("bad command\n");
+        break;
+    case 1:
+        echo(command, wordCount);
+        break;
+    case 2:
+        processInput(history, historyLen, 0);
+        return;
+    case 3:
+    	printf("goodbye:)\n");
+    	exit(atoi(command[1]) & 0xff);
+    }
+
+    if (update == 1)
+    addHistory(command, wordCount);
+}
+
+int main() {
+
+    printf("Starting IC shell\n");
+    char buffer[1000];
+    char *seperatedBuffer[100];
+
+    createCommand(commandList);
+
+    while (1) {
+        printf("icsh $ ");
+        fgets(buffer, 1000, stdin);
+        if (buffer[0] == '\n') continue;
+
+        int wordCount = seperateInput(buffer, seperatedBuffer);
+        processInput(seperatedBuffer, wordCount, 1);
+    }
+}
+
