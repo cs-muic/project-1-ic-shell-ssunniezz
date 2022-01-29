@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <errno.h>
+#include <sys/wait.h>
 
 char *history[100];
 char *commandList[10];
@@ -8,17 +11,21 @@ int commandNum = 3;
 int historyLen = -1;
 
 void echo(char** command, int n) {
+
     for (int i=1; i<n; i++) {
         printf("%s", command[i]);
         if (i < n-1) printf(" ");
     }
+
 }
 
 void addHistory(char** command, int n) {
+
     for (int i=0; i<n; i++) {
         free(history[i]);
         history[i] = strdup(command[i]);
     }
+
     historyLen = n;
 
 }
@@ -44,6 +51,38 @@ int seperateInput(char* command, char** output) {
     return i;
 }
 
+int foreground(char** command) {
+
+    int pid;
+    int status;
+
+    //remove '\n' from last argument and set last element to NULL
+    int i = 0;
+    while (command[i] != NULL) {
+        int last = strlen(command[i]) - 1;
+        if (command[i][last] == '\n') {
+            command[i][last] = '\0';
+            command[++i] = NULL;
+            break;
+        }
+        i++;
+    }
+
+    if ((pid=fork()) < 0) {
+        perror ("Fork failed");
+        exit(errno);
+    }
+    if (!pid) {
+        execvp(command[0], command);
+        exit(1);
+    }
+
+    if (pid) {
+        waitpid(pid, &status, 0);
+        return status;
+    }
+}
+
 //update: 0 = don't update history, 1 = update history
 void processInput(char** command, int wordCount, int update) {
 
@@ -60,15 +99,20 @@ void processInput(char** command, int wordCount, int update) {
 
 
     switch (commandID) {
+    //default
     case 0:
+        if (foreground(command))
         printf("bad command\n");
         break;
+    //command = 'echo'
     case 1:
         echo(command, wordCount);
         break;
     case 2:
+    //command = '!!'
         processInput(history, historyLen, 0);
         return;
+    //command = 'exit'
     case 3:
         printf("goodbye:)\n");
         exit(atoi(command[1]) & 0xff);
