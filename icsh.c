@@ -47,8 +47,8 @@ int seperateInput(char* command, char** output) {
 //update: 0 = don't update history, 1 = update history
 void processInput(char** command, int wordCount, int update) {
 
-	//when called '!!' and there is no last command
-	if ((strcmp("!!\n", command[0]) == 0) && historyLen == -1) return;
+    //when called '!!' and there is no last command
+    if ((strcmp("!!\n", command[0]) == 0) && historyLen == -1) return;
 
     int commandID = 0;
     for (int i=0; i<commandNum; i++) {
@@ -70,21 +70,35 @@ void processInput(char** command, int wordCount, int update) {
         processInput(history, historyLen, 0);
         return;
     case 3:
-    	printf("goodbye:)\n");
-    	exit(atoi(command[1]) & 0xff);
+        printf("goodbye:)\n");
+        exit(atoi(command[1]) & 0xff);
     }
 
     if (update == 1)
     addHistory(command, wordCount);
 }
 
-int main() {
+int main(int argc, char** argv) {
 
-    printf("Starting IC shell\n");
     char buffer[1000];
     char *seperatedBuffer[100];
-
     createCommand(commandList);
+
+    //run from script
+    if (argc == 2) {
+        FILE* fp = fopen(argv[1], "r");
+
+        while(fgets(buffer, 1000, fp)) {
+            if (buffer[0] == '\n') continue;
+
+            int wordCount = seperateInput(buffer, seperatedBuffer);
+            processInput(seperatedBuffer, wordCount, 1);
+        }
+        fclose(fp);
+        return 0;
+    }
+
+    printf("Starting IC shell\n");
 
     while (1) {
         printf("icsh $ ");
@@ -95,4 +109,3 @@ int main() {
         processInput(seperatedBuffer, wordCount, 1);
     }
 }
-
