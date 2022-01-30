@@ -4,11 +4,14 @@
 #include <unistd.h>
 #include <errno.h>
 #include <sys/wait.h>
+#include <signal.h>
 
 char *history[100];
 char *commandList[10];
 int commandNum = 3;
+int commandLen;
 int historyLen = -1;
+int pid = 0;
 
 void echo(char** command, int n) {
 
@@ -17,12 +20,18 @@ void echo(char** command, int n) {
         if (i < n-1) printf(" ");
     }
 
+    printf("\n");
+
 }
 
 void addHistory(char** command, int n) {
 
-    for (int i=0; i<n; i++) {
+    for (int i =0; i< historyLen; i++) {
         free(history[i]);
+        history[i] = NULL;
+    }
+
+    for (int i=0; i<n; i++) {
         history[i] = strdup(command[i]);
     }
 
@@ -33,40 +42,49 @@ void addHistory(char** command, int n) {
 void createCommand(char** list) {
 
     list[0] = "echo";
-    list[1] = "!!\n";
+    list[1] = "!!";
     list[2] = "exit";
 
 }
 
-int seperateInput(char* command, char** output) {
+void seperateInput(char* command, char** output) {
 
     char* words = strtok(command, " ");
+    int len;
 
     int i = 0;
     while (words != NULL) {
         output[i++] = words;
         words = strtok(NULL, " ");
     }
+    len = i;
 
-    return i;
+    //get rid of '\n' from the last argument
+    int lastchar = strlen(output[len-1]) - 1;
+    output[len-1][lastchar] = '\0';
+    if (lastchar == 0) {
+    	output[len-1] = '\0';
+    	len--;
+    }
+
+    //clear the old remaining commands
+    while(i < historyLen) {
+        output[i++] = NULL;
+    }
+
+    commandLen = len;
 }
 
-int foreground(char** command) {
 
-    int pid;
+int foreground(char** command, int len) {
+
     int status;
 
-    //remove '\n' from last argument and set last element to NULL
-    int i = 0;
-    while (command[i] != NULL) {
-        int last = strlen(command[i]) - 1;
-        if (command[i][last] == '\n') {
-            command[i][last] = '\0';
-            command[++i] = NULL;
-            break;
-        }
-        i++;
+    //set last element to NULL
+    for (int i=0; i<len; i++) {
+        if (command[i][0] == '\0') command[i] = NULL;
     }
+    command[len] = NULL;
 
     if ((pid=fork()) < 0) {
         perror ("Fork failed");
@@ -74,20 +92,21 @@ int foreground(char** command) {
     }
     if (!pid) {
         execvp(command[0], command);
-        exit(1);
+        //end process in case of unsupported command
+        exit(127);
     }
 
     if (pid) {
         waitpid(pid, &status, 0);
-        return status;
     }
+        return status;
 }
 
 //update: 0 = don't update history, 1 = update history
 void processInput(char** command, int wordCount, int update) {
 
     //when called '!!' and there is no last command
-    if ((strcmp("!!\n", command[0]) == 0) && historyLen == -1) return;
+    if ((strcmp("!!", command[0]) == 0) && historyLen == -1) return;
 
     int commandID = 0;
     for (int i=0; i<commandNum; i++) {
@@ -97,24 +116,28 @@ void processInput(char** command, int wordCount, int update) {
         }
     }
 
-
+    int status;
     switch (commandID) {
     //default
     case 0:
-        if (foreground(command))
-        printf("bad command\n");
+        status = foreground(command, wordCount);
+        if (status) printf("bad command\n");
         break;
     //command = 'echo'
     case 1:
         echo(command, wordCount);
         break;
-    case 2:
     //command = '!!'
+    case 2:
         processInput(history, historyLen, 0);
         return;
     //command = 'exit'
     case 3:
         printf("goodbye:)\n");
+        //free all history
+    	for (int i=0; i<historyLen; i++) {
+    		free(history[i]);
+    	}
         exit(atoi(command[1]) & 0xff);
     }
 
@@ -135,8 +158,8 @@ int main(int argc, char** argv) {
         while(fgets(buffer, 1000, fp)) {
             if (buffer[0] == '\n') continue;
 
-            int wordCount = seperateInput(buffer, seperatedBuffer);
-            processInput(seperatedBuffer, wordCount, 1);
+            seperateInput(buffer, seperatedBuffer);
+            processInput(seperatedBuffer, commandLen, 1);
         }
         fclose(fp);
         return 0;
@@ -147,9 +170,13 @@ int main(int argc, char** argv) {
     while (1) {
         printf("icsh $ ");
         fgets(buffer, 1000, stdin);
-        if (buffer[0] == '\n') continue;
+        if (buffer[0] == '\n') {
+            continue;
+        }
 
-        int wordCount = seperateInput(buffer, seperatedBuffer);
-        processInput(seperatedBuffer, wordCount, 1);
+        seperateInput(buffer, seperatedBuffer);
+        processInput(seperatedBuffer, commandLen, 1);
     }
 }
+
+
