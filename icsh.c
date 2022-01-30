@@ -12,11 +12,17 @@ void echo(char** command, int n) {
         printf("%s", command[i]);
         if (i < n-1) printf(" ");
     }
+
+    printf("\n");
 }
 
 void addHistory(char** command, int n) {
-    for (int i=0; i<n; i++) {
+    for (int i =0; i< historyLen; i++) {
         free(history[i]);
+        history[i] = NULL;
+    }
+    
+    for (int i=0; i<n; i++) {
         history[i] = strdup(command[i]);
     }
     historyLen = n;
@@ -26,7 +32,7 @@ void addHistory(char** command, int n) {
 void createCommand(char** list) {
 
     list[0] = "echo";
-    list[1] = "!!\n";
+    list[1] = "!!";
     list[2] = "exit";
 
 }
@@ -34,21 +40,35 @@ void createCommand(char** list) {
 int seperateInput(char* command, char** output) {
 
     char* words = strtok(command, " ");
+    int len;
 
     int i = 0;
     while (words != NULL) {
         output[i++] = words;
         words = strtok(NULL, " ");
     }
+    len = i;
 
-    return i;
+    //get rid of '\n' from the last argument
+    int lastchar = strlen(output[len-1]) - 1;
+    output[len-1][lastchar] = '\0';
+    if (lastchar == 0) {
+    	output[len-1] = '\0';
+    	len--;
+    }
+
+    //clear the old remaining commands
+    while(i < historyLen) {
+        output[i++] = NULL;
+    }
+    return len;
 }
 
 //update: 0 = don't update history, 1 = update history
 void processInput(char** command, int wordCount, int update) {
 
 	//when called '!!' and there is no last command
-	if ((strcmp("!!\n", command[0]) == 0) && historyLen == -1) return;
+	if ((strcmp("!!", command[0]) == 0) && historyLen == -1) return;
 
     int commandID = 0;
     for (int i=0; i<commandNum; i++) {
