@@ -90,7 +90,11 @@ void processInput(char** command, int wordCount, int update) {
         return;
     case 3:
         printf("goodbye:)\n");
-        exit(atoi(command[1]) & 0xff);
+       	//free all history
+    	for (int i=0; i<historyLen; i++) {
+    		free(history[i]);
+    	}
+       	exit(atoi(command[1]) & 0xff);
     }
 
     if (update == 1)
