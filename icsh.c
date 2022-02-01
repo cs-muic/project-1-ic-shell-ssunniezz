@@ -16,6 +16,11 @@ int exitCode = 0;
 
 void echo(char** command, int n) {
 
+    if(n == 2 && !(strcmp(command[1], "$?"))) {
+        printf("%d\n", exitCode);
+        return;
+    }
+
     for (int i=1; i<n; i++) {
         printf("%s", command[i]);
         if (i < n-1) printf(" ");
@@ -99,7 +104,7 @@ int foreground(char** command, int len) {
 
     if (pid) {
         waitpid(pid, &status, 0);
-	exitCode = WEXITSTATUS(status);
+        exitCode = WEXITSTATUS(status);
     }
         return status;
 }
@@ -123,15 +128,22 @@ void processInput(char** command, int wordCount, int update) {
     //default
     case 0:
         status = foreground(command, wordCount);
-        if (status && exitCode == 255 && strcmp(command[0], "./icsh")) printf("bad command\n");
+        //if child process was interrupted errno = EINTR
+        if (errno == EINTR) printf("\n");
+        if (status && errno != EINTR && exitCode == 255 && strcmp(command[0], "./hello")) printf("bad command\n");
+
+        //reset errno (so that it won't affect the prompt loop)
+        errno = 0;
         break;
     //command = 'echo'
     case 1:
         echo(command, wordCount);
+        exitCode = 0;
         break;
     //command = '!!'
     case 2:
         processInput(history, historyLen, 0);
+        exitCode = 0;
         return;
     //command = 'exit'
     case 3:
@@ -147,11 +159,36 @@ void processInput(char** command, int wordCount, int update) {
     addHistory(command, wordCount);
 }
 
+
+void signalHandler (int sig, siginfo_t *sip, void *notused) {
+
+    if (pid != 0) {
+        kill(pid, sig);
+        pid = 0;
+    }
+
+   return;
+
+}
+
+void createSigHandler() {
+    struct sigaction action;
+    action.sa_sigaction = signalHandler;
+    sigfillset (&action.sa_mask);
+    action.sa_flags = SA_SIGINFO;
+
+    sigaction(SIGINT, &action, NULL);
+    sigaction(SIGTSTP, &action, NULL);
+
+}
+
 int main(int argc, char** argv) {
 
     char buffer[1000];
     char *seperatedBuffer[100];
     createCommand(commandList);
+
+    createSigHandler();
 
     //run from script
     if (argc == 2) {
@@ -172,7 +209,9 @@ int main(int argc, char** argv) {
     while (1) {
         printf("icsh $ ");
         fgets(buffer, 1000, stdin);
-        if (buffer[0] == '\n') {
+        if (buffer[0] == '\n' || errno == EINTR) {
+            if (errno == EINTR) printf("\n");
+            errno = 0;
             continue;
         }
 
