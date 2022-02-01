@@ -12,6 +12,7 @@ int commandNum = 3;
 int commandLen;
 int historyLen = -1;
 int pid = 0;
+int exitCode = 0;
 
 void echo(char** command, int n) {
 
@@ -93,11 +94,12 @@ int foreground(char** command, int len) {
     if (!pid) {
         execvp(command[0], command);
         //end process in case of unsupported command
-        exit(127);
+        exit(-1);
     }
 
     if (pid) {
         waitpid(pid, &status, 0);
+	exitCode = WEXITSTATUS(status);
     }
         return status;
 }
@@ -121,7 +123,7 @@ void processInput(char** command, int wordCount, int update) {
     //default
     case 0:
         status = foreground(command, wordCount);
-        if (status) printf("bad command\n");
+        if (status && exitCode == 255 && strcmp(command[0], "./icsh")) printf("bad command\n");
         break;
     //command = 'echo'
     case 1:
