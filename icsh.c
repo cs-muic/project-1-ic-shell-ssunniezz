@@ -147,7 +147,7 @@ void processInput(char** command, int wordCount, int update) {
         status = foreground(command, wordCount);
         //if child process was interrupted errno = EINTR
         if (errno == EINTR) printf("\n");
-        if (status && errno != EINTR && exitCode == 255 && strcmp(command[0], "./hello")) printf("bad command\n");
+        if (status && errno != EINTR && exitCode == 255 && strcmp(command[0], "./icsh")) printf("bad command\n");
 
         //reset errno (so that it won't affect the prompt loop)
         errno = 0;
